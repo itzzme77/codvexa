@@ -8,6 +8,8 @@ import {
   Modal,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -223,6 +225,11 @@ export default function LeaveApprovalScreen() {
   );
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <View style={styles.container}>
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
@@ -325,6 +332,7 @@ export default function LeaveApprovalScreen() {
         </View>
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

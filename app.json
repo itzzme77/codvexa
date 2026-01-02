@@ -13,9 +13,20 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.company.codvexa"
     },
-    "android": {},
-    "web": {}
+    "android": {
+      "package": "com.company.codvexa",
+      "adaptiveIcon": {
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {},
+    "extra": {
+      "eas": {
+        "projectId": "3241e587-9e73-4ed7-80f8-961a265c6fcf"
+      }
+    }
   }
 }

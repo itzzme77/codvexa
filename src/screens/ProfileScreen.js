@@ -9,10 +9,12 @@ import {
   TextInput,
   Switch,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ onLogout }) {
   const [changePasswordModal, setChangePasswordModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -21,8 +23,7 @@ export default function ProfileScreen() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-
-  const profileData = {
+  const initialProfile = {
     name: 'John Doe',
     employeeId: 'EMP001',
     department: 'Software Development',
@@ -33,6 +34,10 @@ export default function ProfileScreen() {
     reportingManager: 'Jane Smith',
     workLocation: 'New York Office',
   };
+
+  const [profile, setProfile] = useState(initialProfile);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [draftProfile, setDraftProfile] = useState(initialProfile);
 
   const handleChangePassword = () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -97,6 +102,26 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleStartEditProfile = () => {
+    setDraftProfile(profile);
+    setIsEditingProfile(true);
+  };
+
+  const handleCancelEditProfile = () => {
+    setDraftProfile(profile);
+    setIsEditingProfile(false);
+  };
+
+  const handleSaveProfile = () => {
+    setProfile(draftProfile);
+    setIsEditingProfile(false);
+    Alert.alert('Profile Updated', 'Your profile details have been updated.');
+  };
+
+  const updateDraftProfileField = (field, value) => {
+    setDraftProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -107,7 +132,9 @@ export default function ProfileScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Logged Out', 'You have been logged out successfully');
+            if (typeof onLogout === 'function') {
+              onLogout();
+            }
           },
         },
       ]
@@ -115,6 +142,11 @@ export default function ProfileScreen() {
   };
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <ScrollView style={styles.container}>
       {/* Profile Header */}
       <View style={styles.header}>
@@ -123,23 +155,58 @@ export default function ProfileScreen() {
             <Ionicons name="person" size={60} color="#fff" />
           </View>
         </View>
-        <Text style={styles.name}>{profileData.name}</Text>
-        <Text style={styles.employeeId}>{profileData.employeeId}</Text>
-        <Text style={styles.designation}>{profileData.designation}</Text>
+        <Text style={styles.name}>{profile.name}</Text>
+        <Text style={styles.employeeId}>{profile.employeeId}</Text>
+        <Text style={styles.designation}>{profile.designation}</Text>
       </View>
 
       {/* User Information (Read-only) */}
       <View style={styles.card}>
         <View style={styles.cardHeader}>
-          <Ionicons name="information-circle" size={24} color="#4CAF50" />
-          <Text style={styles.cardTitle}>Personal Information</Text>
+          <View style={styles.cardHeaderLeft}>
+            <Ionicons name="information-circle" size={24} color="#4CAF50" />
+            <Text style={styles.cardTitle}>Personal Information</Text>
+          </View>
+          {isEditingProfile ? (
+            <View style={styles.cardHeaderActions}>
+              <TouchableOpacity
+                style={[styles.chipButton, styles.chipButtonSecondary]}
+                onPress={handleCancelEditProfile}
+              >
+                <Text style={styles.chipButtonSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.chipButton, styles.chipButtonPrimary]}
+                onPress={handleSaveProfile}
+              >
+                <Text style={styles.chipButtonPrimaryText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.chipButton, styles.chipButtonPrimary]}
+              onPress={handleStartEditProfile}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" />
+              <Text style={styles.chipButtonPrimaryText}>Edit</Text>
+            </TouchableOpacity>
+          )}
         </View>
         
         <View style={styles.infoRow}>
           <Ionicons name="briefcase-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Department</Text>
-            <Text style={styles.infoValue}>{profileData.department}</Text>
+            {isEditingProfile ? (
+              <TextInput
+                style={styles.infoInput}
+                value={draftProfile.department}
+                onChangeText={(text) => updateDraftProfileField('department', text)}
+                placeholder="Enter department"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{profile.department}</Text>
+            )}
           </View>
         </View>
 
@@ -147,7 +214,7 @@ export default function ProfileScreen() {
           <Ionicons name="mail-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Email</Text>
-            <Text style={styles.infoValue}>{profileData.email}</Text>
+            <Text style={styles.infoValue}>{profile.email}</Text>
           </View>
         </View>
 
@@ -155,7 +222,17 @@ export default function ProfileScreen() {
           <Ionicons name="call-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Phone</Text>
-            <Text style={styles.infoValue}>{profileData.phone}</Text>
+            {isEditingProfile ? (
+              <TextInput
+                style={styles.infoInput}
+                value={draftProfile.phone}
+                onChangeText={(text) => updateDraftProfileField('phone', text)}
+                placeholder="Enter phone number"
+                keyboardType="phone-pad"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{profile.phone}</Text>
+            )}
           </View>
         </View>
 
@@ -163,7 +240,16 @@ export default function ProfileScreen() {
           <Ionicons name="location-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Work Location</Text>
-            <Text style={styles.infoValue}>{profileData.workLocation}</Text>
+            {isEditingProfile ? (
+              <TextInput
+                style={styles.infoInput}
+                value={draftProfile.workLocation}
+                onChangeText={(text) => updateDraftProfileField('workLocation', text)}
+                placeholder="Enter work location"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{profile.workLocation}</Text>
+            )}
           </View>
         </View>
 
@@ -171,7 +257,7 @@ export default function ProfileScreen() {
           <Ionicons name="people-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Reporting Manager</Text>
-            <Text style={styles.infoValue}>{profileData.reportingManager}</Text>
+            <Text style={styles.infoValue}>{profile.reportingManager}</Text>
           </View>
         </View>
 
@@ -179,7 +265,7 @@ export default function ProfileScreen() {
           <Ionicons name="calendar-outline" size={20} color="#666" />
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Join Date</Text>
-            <Text style={styles.infoValue}>{profileData.joinDate}</Text>
+            <Text style={styles.infoValue}>{profile.joinDate}</Text>
           </View>
         </View>
       </View>
@@ -379,6 +465,7 @@ export default function ProfileScreen() {
         </View>
       </Modal>
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -441,7 +528,17 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 15,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   cardTitle: {
     fontSize: 18,
@@ -469,6 +566,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     fontWeight: '500',
+  },
+  infoInput: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    backgroundColor: '#FAFAFA',
+    marginTop: 4,
   },
   sectionTitle: {
     fontSize: 18,
@@ -638,5 +747,29 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  chipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  chipButtonPrimary: {
+    backgroundColor: '#4CAF50',
+    gap: 6,
+  },
+  chipButtonSecondary: {
+    backgroundColor: '#F5F5F5',
+  },
+  chipButtonPrimaryText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipButtonSecondaryText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

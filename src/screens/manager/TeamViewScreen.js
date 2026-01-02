@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -134,6 +136,11 @@ export default function TeamViewScreen() {
   });
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -152,11 +159,7 @@ export default function TeamViewScreen() {
       </View>
 
       {/* Status Filters */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterContainer}
-      >
+      <View style={styles.filterContainer}>
         {statusFilters.map((filter) => (
           <TouchableOpacity
             key={filter.key}
@@ -176,115 +179,60 @@ export default function TeamViewScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </ScrollView>
+      </View>
 
       {/* Team Members List */}
       <ScrollView style={styles.content}>
         {filteredMembers.map((member) => (
           <View key={member.id} style={styles.memberCard}>
-            <View style={styles.memberHeader}>
-              <View style={styles.memberInfo}>
-                <View
-                  style={[
-                    styles.avatarPlaceholder,
-                    { backgroundColor: getStatusColor(member.status) },
-                  ]}
-                >
-                  <Ionicons name="person" size={28} color="#fff" />
-                </View>
-                <View style={styles.memberDetails}>
-                  <Text style={styles.memberName}>{member.name}</Text>
-                  <Text style={styles.memberId}>{member.id}</Text>
-                  <Text style={styles.memberDesignation}>{member.designation}</Text>
-                </View>
+            <View style={styles.memberRow}>
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  { backgroundColor: getStatusColor(member.status) },
+                ]}
+              >
+                <Ionicons name="person" size={24} color="#fff" />
               </View>
+              
+              <View style={styles.memberInfo}>
+                <Text style={styles.memberName}>{member.name}</Text>
+                <Text style={styles.memberMeta}>{member.id} • {member.designation}</Text>
+                
+                {member.status === 'on-leave' && member.leaveType && (
+                  <Text style={styles.leaveNote}>🏖️ {member.leaveType}</Text>
+                )}
+              </View>
+
               <View
                 style={[
                   styles.statusBadge,
                   { backgroundColor: getStatusColor(member.status) },
                 ]}
               >
-                <Ionicons name={getStatusIcon(member.status)} size={14} color="#fff" />
-                <Text style={styles.statusText}>{getStatusLabel(member.status)}</Text>
+                <Ionicons name={getStatusIcon(member.status)} size={12} color="#fff" />
               </View>
             </View>
 
-            {member.status === 'on-leave' && member.leaveType && (
-              <View style={styles.leaveInfo}>
-                <Ionicons name="information-circle-outline" size={16} color="#2196F3" />
-                <Text style={styles.leaveInfoText}>{member.leaveType}</Text>
+            <View style={styles.infoRow}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Clock In</Text>
+                <Text style={styles.infoValue}>{member.clockIn || '--:--'}</Text>
               </View>
-            )}
-
-            <View style={styles.attendanceRow}>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="log-in-outline" size={16} color="#4CAF50" />
-                <Text style={styles.attendanceLabel}>Clock In</Text>
-                <Text style={styles.attendanceValue}>
-                  {member.clockIn || '--:--'}
-                </Text>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Clock Out</Text>
+                <Text style={styles.infoValue}>{member.clockOut || '--:--'}</Text>
               </View>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="log-out-outline" size={16} color="#F44336" />
-                <Text style={styles.attendanceLabel}>Clock Out</Text>
-                <Text style={styles.attendanceValue}>
-                  {member.clockOut || '--:--'}
-                </Text>
-              </View>
-              <View style={styles.attendanceItem}>
-                <Ionicons name="time-outline" size={16} color="#2196F3" />
-                <Text style={styles.attendanceLabel}>Hours</Text>
-                <Text style={styles.attendanceValue}>{member.workHours}</Text>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Hours</Text>
+                <Text style={styles.infoValue}>{member.workHours}</Text>
               </View>
             </View>
-
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Attendance Rate</Text>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      {
-                        width: `${member.attendanceRate}%`,
-                        backgroundColor: getStatusColor(member.status),
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.statValue}>{member.attendanceRate}%</Text>
-              </View>
-            </View>
-
-            <View style={styles.leaveBalanceRow}>
-              <Text style={styles.leaveBalanceTitle}>Leave Balance:</Text>
-              <View style={styles.leaveBalanceChips}>
-                <View style={[styles.leaveChip, { backgroundColor: '#EF535020' }]}>
-                  <Text style={[styles.leaveChipText, { color: '#EF5350' }]}>
-                    SL: {member.leaveBalance.sick}
-                  </Text>
-                </View>
-                <View style={[styles.leaveChip, { backgroundColor: '#42A5F520' }]}>
-                  <Text style={[styles.leaveChipText, { color: '#42A5F5' }]}>
-                    CL: {member.leaveBalance.casual}
-                  </Text>
-                </View>
-                <View style={[styles.leaveChip, { backgroundColor: '#66BB6A20' }]}>
-                  <Text style={[styles.leaveChipText, { color: '#66BB6A' }]}>
-                    EL: {member.leaveBalance.earned}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.viewDetailsButton}>
-              <Text style={styles.viewDetailsText}>View Details</Text>
-              <Ionicons name="chevron-forward" size={16} color="#4CAF50" />
-            </TouchableOpacity>
           </View>
         ))}
       </ScrollView>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -313,26 +261,23 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   filterContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
+    gap: 8,
   },
   filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    marginRight: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F5',
   },
   filterChipActive: {
     backgroundColor: '#4CAF50',
   },
   filterChipText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: '#666',
   },
@@ -348,162 +293,71 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    elevation: 0,
+    elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
     borderWidth: 1,
     borderColor: '#E8EAED',
   },
-  memberHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  memberInfo: {
+  memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
     gap: 12,
-    flex: 1,
   },
   avatarPlaceholder: {
-    width: 55,
-    height: 55,
-    borderRadius: 27.5,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  memberDetails: {
+  memberInfo: {
     flex: 1,
   },
   memberName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#333',
+    marginBottom: 2,
   },
-  memberId: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 2,
-  },
-  memberDesignation: {
+  memberMeta: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    color: '#999',
+  },
+  leaveNote: {
+    fontSize: 11,
+    color: '#2196F3',
+    marginTop: 4,
+    fontWeight: '500',
   },
   statusBadge: {
-    flexDirection: 'row',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignItems: 'center',
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  leaveInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E3F2FD',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 8,
-  },
-  leaveInfoText: {
-    fontSize: 12,
-    color: '#2196F3',
-    fontWeight: '600',
-  },
-  attendanceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#F5F5F5',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  attendanceItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  attendanceLabel: {
-    fontSize: 10,
-    color: '#999',
-  },
-  attendanceValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#333',
-  },
-  statsRow: {
-    marginBottom: 12,
-  },
-  statItem: {
-    gap: 8,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  statValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#333',
-    textAlign: 'right',
-  },
-  leaveBalanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  leaveBalanceTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-  },
-  leaveBalanceChips: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  leaveChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  leaveChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  viewDetailsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
-    backgroundColor: '#E8F5E9',
-    padding: 12,
-    borderRadius: 10,
-    gap: 6,
+    alignItems: 'center',
   },
-  viewDetailsText: {
-    fontSize: 14,
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  infoItem: {
+    alignItems: 'center',
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#999',
+    marginBottom: 4,
+  },
+  infoValue: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#333',
   },
 });

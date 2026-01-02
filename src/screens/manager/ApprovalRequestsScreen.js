@@ -8,6 +8,8 @@ import {
   Modal,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -432,6 +434,11 @@ export default function ApprovalRequestsScreen() {
   const renderCard = selectedTab === 'leave' ? renderLeaveCard : renderAttendanceCard;
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <View style={styles.container}>
       {/* Main Tab Navigation - Leave / Attendance */}
       <View style={styles.mainTabContainer}>
@@ -637,6 +644,7 @@ export default function ApprovalRequestsScreen() {
         </View>
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

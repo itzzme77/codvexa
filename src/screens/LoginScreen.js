@@ -1,0 +1,312 @@
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+
+export default function LoginScreen({ onLogin }) {
+  const [selectedTab, setSelectedTab] = useState('employee');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleLogin = () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Please enter username and password');
+      return;
+    }
+
+    // Admin can login from either section
+    if (username === 'Admin01' && password === 'admin123') {
+      onLogin('admin');
+      return;
+    }
+
+    // Employee section
+    if (selectedTab === 'employee') {
+      if (username === 'Employee01' && password === 'employee123') {
+        onLogin('employee');
+      } else {
+        Alert.alert('Invalid credentials', 'Employee username or password is incorrect');
+      }
+    }
+    
+    // Manager section
+    if (selectedTab === 'manager') {
+      if (username === 'Manager01' && password === 'manager123') {
+        onLogin('manager');
+      } else {
+        Alert.alert('Invalid credentials', 'Manager username or password is incorrect');
+      }
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="briefcase" size={40} color="#4CAF50" />
+          </View>
+          <Text style={styles.title}>Attendance System</Text>
+          <Text style={styles.subtitle}>Sign in to your account</Text>
+        </View>
+
+        <View style={styles.card}>
+          {/* Tab Selector */}
+          <View style={styles.tabContainer}>
+            <TouchableOpacity
+              style={[styles.tab, selectedTab === 'employee' && styles.tabActive]}
+              onPress={() => {
+                setSelectedTab('employee');
+                setUsername('');
+                setPassword('');
+              }}
+            >
+              <Ionicons 
+                name="person" 
+                size={20} 
+                color={selectedTab === 'employee' ? '#4CAF50' : '#999'} 
+              />
+              <Text style={[styles.tabText, selectedTab === 'employee' && styles.tabTextActive]}>
+                Employee
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tab, selectedTab === 'manager' && styles.tabActive]}
+              onPress={() => {
+                setSelectedTab('manager');
+                setUsername('');
+                setPassword('');
+              }}
+            >
+              <Ionicons 
+                name="people" 
+                size={20} 
+                color={selectedTab === 'manager' ? '#4CAF50' : '#999'} 
+              />
+              <Text style={[styles.tabText, selectedTab === 'manager' && styles.tabTextActive]}>
+                Manager
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Login Form */}
+          <View style={styles.formContainer}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Username</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder={selectedTab === 'employee' ? 'Employee01' : 'Manager01'}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.label}>Password</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="lock-closed-outline" size={20} color="#999" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                  <Ionicons 
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'} 
+                    size={20} 
+                    color="#999" 
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.button} onPress={handleLogin}>
+              <Text style={styles.buttonText}>Sign In</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Hint Box */}
+          <View style={styles.hintBox}>
+            <View style={styles.hintHeader}>
+              <Ionicons name="information-circle" size={16} color="#4CAF50" />
+              <Text style={styles.hintTitle}>Test Credentials</Text>
+            </View>
+            {selectedTab === 'employee' ? (
+              <>
+                <Text style={styles.hintText}>👤 Employee01 / employee123</Text>
+                <Text style={styles.hintTextSecondary}>🔑 Admin01 / admin123 (Admin access)</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.hintText}>👤 Manager01 / manager123</Text>
+                <Text style={styles.hintTextSecondary}>🔑 Admin01 / admin123 (Admin access)</Text>
+              </>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F7FA',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    padding: 24,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E8F5E9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 24,
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  tabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+  },
+  tabTextActive: {
+    color: '#4CAF50',
+  },
+  formContainer: {
+    marginBottom: 20,
+  },
+  field: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#F9FAFB',
+  },
+  inputIcon: {
+    marginRight: 10,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#111827',
+  },
+  button: {
+    marginTop: 8,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  hintBox: {
+    backgroundColor: '#F0FDF4',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  hintHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  hintTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4CAF50',
+  },
+  hintText: {
+    fontSize: 13,
+    color: '#166534',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
+  hintTextSecondary: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontStyle: 'italic',
+  },
+});

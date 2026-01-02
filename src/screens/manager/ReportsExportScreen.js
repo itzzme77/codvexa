@@ -9,6 +9,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 export default function ReportsExportScreen() {
   const [selectedReport, setSelectedReport] = useState('attendance');
@@ -107,31 +109,184 @@ export default function ReportsExportScreen() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const formatLabel = exportFormats.find((f) => f.id === selectedFormat)?.label || 'CSV';
     const reportLabel = reportTypes.find((r) => r.id === selectedReport)?.label || 'Attendance Report';
     const recordCount = getRecordCount();
 
-    Alert.alert(
-      'Export Report',
-      `Export ${reportLabel}\nFormat: ${formatLabel}\nPeriod: ${getDateRangeText()}\nRecords: ${recordCount}\n\nProceed with export?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Export',
-          onPress: () => {
-            // Simulate export process
-            setTimeout(() => {
-              Alert.alert(
-                'Export Successful! ✓',
-                `${reportLabel} has been exported as ${formatLabel}\n\nFile saved to:\nDownloads/attendance_report_${Date.now()}.${selectedFormat}\n\n📧 Report also sent to your email`,
-                [{ text: 'OK' }]
-              );
-            }, 1000);
-          },
-        },
-      ]
-    );
+    try {
+      let fileContent = '';
+      let fileExtension = selectedFormat;
+      let mimeType = 'text/plain';
+      
+      // Generate content based on selected format
+      if (selectedFormat === 'csv') {
+        fileContent = generateCSV();
+        mimeType = 'text/csv';
+      } else if (selectedFormat === 'excel') {
+        fileContent = generateExcel();
+        fileExtension = 'xls';
+        mimeType = 'application/vnd.ms-excel';
+      } else if (selectedFormat === 'pdf') {
+        fileContent = generatePDF();
+        mimeType = 'application/pdf';
+      }
+
+      // Create file name with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const fileName = `${selectedReport}_report_${timestamp}.${fileExtension}`;
+      const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+
+      // Write file
+      await FileSystem.writeAsStringAsync(fileUri, fileContent);
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      
+      if (isAvailable) {
+        Alert.alert(
+          'Export Successful! ✓',
+          `${reportLabel} has been exported as ${formatLabel}\n\nFile: ${fileName}\n\nWould you like to share the file?`,
+          [
+            { text: 'Later', style: 'cancel' },
+            {
+              text: 'Share',
+              onPress: async () => {
+                await Sharing.shareAsync(fileUri);
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Export Successful! ✓',
+          `${reportLabel} has been exported as ${formatLabel}\n\nFile saved to:\n${fileUri}`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Export Failed', `Error: ${error.message}`);
+    }
+  };
+
+  const generateCSV = () => {
+    let csv = '';
+    
+    if (selectedReport === 'attendance') {
+      csv = 'Date,Employee ID,Name,Clock In,Clock Out,Hours,Status\n';
+      attendanceData.forEach(record => {
+        csv += `${record.date},${record.employeeId},${record.name},${record.clockIn},${record.clockOut},${record.hours},${record.status}\n`;
+      });
+    } else if (selectedReport === 'leave') {
+      csv = 'Employee ID,Name,Leave Type,Start Date,End Date,Days,Status\n';
+      leaveData.forEach(record => {
+        csv += `${record.employeeId},${record.name},${record.leaveType},${record.startDate},${record.endDate},${record.days},${record.status}\n`;
+      });
+    } else if (selectedReport === 'summary') {
+      csv = 'Metric,Value\n';
+      Object.entries(summaryData).forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').trim();
+        csv += `${label},${value}\n`;
+      });
+    } else if (selectedReport === 'detailed') {
+      csv = 'Report Type,Detailed Report\n';
+      csv += 'Date Range,' + getDateRangeText() + '\n\n';
+      csv += 'Date,Employee ID,Name,Clock In,Clock Out,Hours,Status\n';
+      attendanceData.forEach(record => {
+        csv += `${record.date},${record.employeeId},${record.name},${record.clockIn},${record.clockOut},${record.hours},${record.status}\n`;
+      });
+    }
+    
+    return csv;
+  };
+
+  const generateExcel = () => {
+    // Generate HTML table that can be opened in Excel
+    let html = '<html xmlns:x="urn:schemas-microsoft-com:office:excel">\n';
+    html += '<head><meta charset="UTF-8"><style>table {border-collapse: collapse;} th, td {border: 1px solid #ddd; padding: 8px;} th {background-color: #4CAF50; color: white;}</style></head>\n';
+    html += '<body>\n';
+    html += `<h2>${reportTypes.find((r) => r.id === selectedReport)?.label}</h2>\n`;
+    html += `<p>Period: ${getDateRangeText()}</p>\n`;
+    html += '<table>\n';
+    
+    if (selectedReport === 'attendance') {
+      html += '<tr><th>Date</th><th>Employee ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr>\n';
+      attendanceData.forEach(record => {
+        html += `<tr><td>${record.date}</td><td>${record.employeeId}</td><td>${record.name}</td><td>${record.clockIn}</td><td>${record.clockOut}</td><td>${record.hours}</td><td>${record.status}</td></tr>\n`;
+      });
+    } else if (selectedReport === 'leave') {
+      html += '<tr><th>Employee ID</th><th>Name</th><th>Leave Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr>\n';
+      leaveData.forEach(record => {
+        html += `<tr><td>${record.employeeId}</td><td>${record.name}</td><td>${record.leaveType}</td><td>${record.startDate}</td><td>${record.endDate}</td><td>${record.days}</td><td>${record.status}</td></tr>\n`;
+      });
+    } else if (selectedReport === 'summary') {
+      html += '<tr><th>Metric</th><th>Value</th></tr>\n';
+      Object.entries(summaryData).forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').trim();
+        html += `<tr><td>${label}</td><td>${value}</td></tr>\n`;
+      });
+    } else if (selectedReport === 'detailed') {
+      html += '<tr><th>Date</th><th>Employee ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr>\n';
+      attendanceData.forEach(record => {
+        html += `<tr><td>${record.date}</td><td>${record.employeeId}</td><td>${record.name}</td><td>${record.clockIn}</td><td>${record.clockOut}</td><td>${record.hours}</td><td>${record.status}</td></tr>\n`;
+      });
+    }
+    
+    html += '</table>\n</body>\n</html>';
+    return html;
+  };
+
+  const generatePDF = () => {
+    // Generate HTML content that can be viewed/converted to PDF
+    let html = '<!DOCTYPE html>\n<html>\n<head>\n';
+    html += '<meta charset="UTF-8">\n';
+    html += '<style>\n';
+    html += 'body { font-family: Arial, sans-serif; padding: 20px; }\n';
+    html += 'h1 { color: #4CAF50; }\n';
+    html += 'table { width: 100%; border-collapse: collapse; margin-top: 20px; }\n';
+    html += 'th { background-color: #4CAF50; color: white; padding: 12px; text-align: left; }\n';
+    html += 'td { padding: 10px; border-bottom: 1px solid #ddd; }\n';
+    html += 'tr:hover { background-color: #f5f5f5; }\n';
+    html += '.header { margin-bottom: 20px; }\n';
+    html += '.info { color: #666; font-size: 14px; }\n';
+    html += '</style>\n</head>\n<body>\n';
+    html += '<div class="header">\n';
+    html += `<h1>${reportTypes.find((r) => r.id === selectedReport)?.label}</h1>\n`;
+    html += `<p class="info">Period: ${getDateRangeText()}</p>\n`;
+    html += `<p class="info">Generated: ${new Date().toLocaleDateString()}</p>\n`;
+    html += '</div>\n';
+    html += '<table>\n';
+    
+    if (selectedReport === 'attendance') {
+      html += '<thead><tr><th>Date</th><th>Employee ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr></thead>\n<tbody>\n';
+      attendanceData.forEach(record => {
+        html += `<tr><td>${record.date}</td><td>${record.employeeId}</td><td>${record.name}</td><td>${record.clockIn}</td><td>${record.clockOut}</td><td>${record.hours}</td><td>${record.status}</td></tr>\n`;
+      });
+    } else if (selectedReport === 'leave') {
+      html += '<thead><tr><th>Employee ID</th><th>Name</th><th>Leave Type</th><th>Start Date</th><th>End Date</th><th>Days</th><th>Status</th></tr></thead>\n<tbody>\n';
+      leaveData.forEach(record => {
+        html += `<tr><td>${record.employeeId}</td><td>${record.name}</td><td>${record.leaveType}</td><td>${record.startDate}</td><td>${record.endDate}</td><td>${record.days}</td><td>${record.status}</td></tr>\n`;
+      });
+    } else if (selectedReport === 'summary') {
+      html += '<thead><tr><th>Metric</th><th>Value</th></tr></thead>\n<tbody>\n';
+      Object.entries(summaryData).forEach(([key, value]) => {
+        const label = key.replace(/([A-Z])/g, ' $1').trim().replace(/^\w/, c => c.toUpperCase());
+        html += `<tr><td>${label}</td><td><strong>${value}</strong></td></tr>\n`;
+      });
+    } else if (selectedReport === 'detailed') {
+      html += '<thead><tr><th>Date</th><th>Employee ID</th><th>Name</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Status</th></tr></thead>\n<tbody>\n';
+      attendanceData.forEach(record => {
+        html += `<tr><td>${record.date}</td><td>${record.employeeId}</td><td>${record.name}</td><td>${record.clockIn}</td><td>${record.clockOut}</td><td>${record.hours}</td><td>${record.status}</td></tr>\n`;
+      });
+    }
+    
+    html += '</tbody>\n</table>\n';
+    html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #4CAF50; text-align: center; color: #999;">\n';
+    html += '<p>This is an attendance management system report</p>\n';
+    html += `<p>Total Records: ${getRecordCount()}</p>\n`;
+    html += '</div>\n';
+    html += '</body>\n</html>';
+    return html;
   };
 
   const handleCustomDateRange = () => {

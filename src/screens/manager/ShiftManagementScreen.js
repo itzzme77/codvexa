@@ -9,6 +9,8 @@ import {
   TextInput,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -488,6 +490,11 @@ export default function ShiftManagementScreen() {
   );
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
@@ -767,6 +774,7 @@ export default function ShiftManagementScreen() {
         </View>
       </Modal>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -8,16 +8,21 @@ import {
   TextInput,
   Modal,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function LeaveScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [leaveType, setLeaveType] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
   const [reason, setReason] = useState('');
   const [showLeaveTypePicker, setShowLeaveTypePicker] = useState(false);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const leaveBalance = {
     sick: { total: 12, used: 3, available: 9 },
@@ -105,6 +110,15 @@ export default function LeaveScreen() {
     }
   };
 
+  const formatDate = (date) => {
+    if (!date) return '';
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
   const handleSubmitLeave = () => {
     if (!leaveType || !startDate || !endDate || !reason.trim()) {
       Alert.alert('Error', 'Please fill all required fields');
@@ -117,8 +131,8 @@ export default function LeaveScreen() {
         onPress: () => {
           setModalVisible(false);
           setLeaveType('');
-          setStartDate('');
-          setEndDate('');
+          setStartDate(null);
+          setEndDate(null);
           setReason('');
         },
       },
@@ -127,13 +141,33 @@ export default function LeaveScreen() {
 
   const calculateDays = () => {
     if (startDate && endDate) {
-      // Simple day calculation for demo
-      return '1-5 days';
+      const start = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+      );
+      const end = new Date(
+        endDate.getFullYear(),
+        endDate.getMonth(),
+        endDate.getDate()
+      );
+      const diffTime = end.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+      if (diffDays <= 0) {
+        return 'Invalid range';
+      }
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'}`;
     }
     return '';
   };
 
   return (
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
     <ScrollView style={styles.container}>
       {/* Leave Balance Overview */}
       <View style={styles.balanceOverview}>
@@ -348,25 +382,31 @@ export default function LeaveScreen() {
 
               {/* Date Range */}
               <Text style={styles.inputLabel}>Start Date <Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity style={styles.dateInput}>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => setShowStartPicker(true)}
+              >
                 <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-                <TextInput
-                  style={styles.dateInputText}
-                  placeholder="DD/MM/YYYY"
-                  value={startDate}
-                  onChangeText={setStartDate}
-                />
+                <Text style={styles.dateInputText}>
+                  {startDate ? formatDate(startDate) : 'DD/MM/YYYY'}
+                </Text>
               </TouchableOpacity>
 
               <Text style={styles.inputLabel}>End Date <Text style={styles.required}>*</Text></Text>
-              <TouchableOpacity style={styles.dateInput}>
+              <TouchableOpacity
+                style={styles.dateInput}
+                onPress={() => {
+                  if (!startDate) {
+                    Alert.alert('Select Start Date', 'Please select the start date first.');
+                    return;
+                  }
+                  setShowEndPicker(true);
+                }}
+              >
                 <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
-                <TextInput
-                  style={styles.dateInputText}
-                  placeholder="DD/MM/YYYY"
-                  value={endDate}
-                  onChangeText={setEndDate}
-                />
+                <Text style={styles.dateInputText}>
+                  {endDate ? formatDate(endDate) : 'DD/MM/YYYY'}
+                </Text>
               </TouchableOpacity>
 
               {startDate && endDate && (
@@ -398,8 +438,8 @@ export default function LeaveScreen() {
                   onPress={() => {
                     setModalVisible(false);
                     setLeaveType('');
-                    setStartDate('');
-                    setEndDate('');
+                    setStartDate(null);
+                    setEndDate(null);
                     setReason('');
                   }}
                 >
@@ -416,7 +456,40 @@ export default function LeaveScreen() {
           </View>
         </View>
       </Modal>
+
+      {showStartPicker && (
+        <DateTimePicker
+          value={startDate || new Date()}
+          mode="date"
+          display="default"
+          onChange={(event, selectedDate) => {
+            setShowStartPicker(false);
+            if (event.type === 'set' && selectedDate) {
+              setStartDate(selectedDate);
+              if (endDate && selectedDate > endDate) {
+                setEndDate(selectedDate);
+              }
+            }
+          }}
+        />
+      )}
+
+      {showEndPicker && (
+        <DateTimePicker
+          value={endDate || startDate || new Date()}
+          mode="date"
+          display="default"
+          minimumDate={startDate || new Date()}
+          onChange={(event, selectedDate) => {
+            setShowEndPicker(false);
+            if (event.type === 'set' && selectedDate) {
+              setEndDate(selectedDate);
+            }
+          }}
+        />
+      )}
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
