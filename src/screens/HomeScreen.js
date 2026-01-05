@@ -7,18 +7,29 @@ import {
   Modal,
   ScrollView,
   StatusBar,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { OFFICE_LOCATIONS, MAX_ATTENDANCE_DISTANCE } from '../../config/officeLocations';
 
 export default function HomeScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isClockIn, setIsClockIn] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [checkingLocation, setCheckingLocation] = useState(false);
   const [todayStatus, setTodayStatus] = useState({
     clockInTime: null,
     clockOutTime: null,
     totalHours: '0h 0m',
+    location: null,
+    distance: null,
   });
+
+  // Use main office location from config
+  const OFFICE_LOCATION = OFFICE_LOCATIONS.main;
+  const MAX_DISTANCE_METERS = MAX_ATTENDANCE_DISTANCE;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -27,6 +38,73 @@ export default function HomeScreen() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Calculate distance between two coordinates using Haversine formula
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = (lat1 * Math.PI) / 180;
+    const φ2 = (lat2 * Math.PI) / 180;
+    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+    const a =
+      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // Distance in meters
+  };
+
+  const verifyLocation = async () => {
+    try {
+      setCheckingLocation(true);
+
+      // Request location permissions
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Location permission is required for attendance marking. Please enable location access in your device settings.',
+          [{ text: 'OK' }]
+        );
+        setCheckingLocation(false);
+        return null;
+      }
+
+      // Get current location with high accuracy
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // Calculate distance from office
+      const distance = calculateDistance(
+        latitude,
+        longitude,
+        OFFICE_LOCATION.latitude,
+        OFFICE_LOCATION.longitude
+      );
+
+      setCheckingLocation(false);
+
+      return {
+        latitude,
+        longitude,
+        distance: Math.round(distance),
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      setCheckingLocation(false);
+      Alert.alert(
+        'Location Error',
+        `Unable to fetch location: ${error.message}. Please ensure GPS is enabled.`,
+        [{ text: 'OK' }]
+      );
+      return null;
+    }
+  };
 
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', {
@@ -45,33 +123,114 @@ export default function HomeScreen() {
     });
   };
 
-  const handleClockAction = () => {
+  // Calculate total hours between clock in and clock out times
+  const calculateTotalHours = (clockInTime, clockOutTime) => {
+    if (!clockInTime || !clockOutTime) {
+      return '0h 0m';
+    }
+
+    // Parse time string format "HH:MM:SS AM/PM"
+    const parseTime = (timeStr) => {
+      const [time, period] = timeStr.split(' ');
+      let [hours, minutes, seconds = 0] = time.split(':').map(Number);
+      
+      if (period === 'PM' && hours !== 12) hours += 12;
+      if (period === 'AM' && hours === 12) hours = 0;
+      
+      const date = new Date();
+      date.setHours(hours, minutes, seconds || 0, 0);
+      return date;
+    };
+
+    const clockInDate = parseTime(clockInTime);
+    const clockOutDate = parseTime(clockOutTime);
+    
+    const diff = clockOutDate - clockInDate;
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    
+    return `${hours}h ${minutes}m`;
+  };
+
+  const handleClockAction = async () => {
+    // Verify location before showing confirmation modal
+    const locationData = await verifyLocation();
+    
+    if (!locationData) {
+      // Location verification failed (error already shown)
+      return;
+    }
+
+    const { distance } = locationData;
+
+    if (distance > MAX_DISTANCE_METERS) {
+      Alert.alert(
+        'Location Verification Failed',
+        `You must be within ${MAX_DISTANCE_METERS} meters of the office to mark attendance.\n\n` +
+        `Your current distance: ${distance} meters\n` +
+        `Office location: ${OFFICE_LOCATION.name}\n\n` +
+        `Please move closer to the office and try again.`,
+        [{ text: 'OK', style: 'cancel' }]
+      );
+      return;
+    }
+
+    // Location verified - show confirmation modal
+    setTodayStatus({
+      ...todayStatus,
+      location: locationData,
+      distance: distance,
+    });
     setModalVisible(true);
   };
 
   const confirmClockAction = () => {
     const now = new Date();
+    const timeNow = formatTime(now);
+    
     if (!isClockIn) {
+      // Clock In
       setTodayStatus({
         ...todayStatus,
-        clockInTime: formatTime(now),
+        clockInTime: timeNow,
       });
       setIsClockIn(true);
+      
+      Alert.alert(
+        'Clock In Successful',
+        `Time: ${timeNow}\n` +
+        `Location verified: ${todayStatus.distance}m from office\n` +
+        `GPS: ${todayStatus.location?.latitude.toFixed(6)}, ${todayStatus.location?.longitude.toFixed(6)}`,
+        [{ text: 'OK' }]
+      );
     } else {
-      const clockInDate = new Date();
-      clockInDate.setHours(9, 0, 0); // Example clock-in time
-      const diff = now - clockInDate;
-      const hours = Math.floor(diff / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
+      // Clock Out - Calculate actual total hours
+      const totalHours = calculateTotalHours(todayStatus.clockInTime, timeNow);
       
       setTodayStatus({
         ...todayStatus,
-        clockOutTime: formatTime(now),
-        totalHours: `${hours}h ${minutes}m`,
+        clockOutTime: timeNow,
+        totalHours: totalHours,
       });
       setIsClockIn(false);
+      
+      Alert.alert(
+        'Clock Out Successful',
+        `Time: ${timeNow}\n` +
+        `Total hours: ${totalHours}\n` +
+        `Location verified: ${todayStatus.distance}m from office`,
+        [{ text: 'OK' }]
+      );
     }
     setModalVisible(false);
+    
+    // Log for backend integration
+    console.log('Attendance marked:', {
+      type: isClockIn ? 'clock-out' : 'clock-in',
+      time: timeNow,
+      location: todayStatus.location,
+      distance: todayStatus.distance,
+    });
   };
 
   return (
@@ -90,18 +249,37 @@ export default function HomeScreen() {
           style={[
             styles.clockButton,
             isClockIn ? styles.clockOutButton : styles.clockInButton,
+            checkingLocation && styles.clockButtonDisabled,
           ]}
           onPress={handleClockAction}
+          disabled={checkingLocation}
         >
-          <Ionicons
-            name={isClockIn ? 'log-out-outline' : 'log-in-outline'}
-            size={60}
-            color="#fff"
-          />
-          <Text style={styles.clockButtonText}>
-            {isClockIn ? 'Clock Out' : 'Clock In'}
-          </Text>
+          {checkingLocation ? (
+            <>
+              <ActivityIndicator size="large" color="#fff" />
+              <Text style={styles.clockButtonText}>Verifying Location...</Text>
+            </>
+          ) : (
+            <>
+              <Ionicons
+                name={isClockIn ? 'log-out-outline' : 'log-in-outline'}
+                size={60}
+                color="#fff"
+              />
+              <Text style={styles.clockButtonText}>
+                {isClockIn ? 'Clock Out' : 'Clock In'}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
+        
+        {/* Location requirement info */}
+        <View style={styles.locationInfo}>
+          <Ionicons name="location-outline" size={16} color="#666" />
+          <Text style={styles.locationInfoText}>
+            You must be within {MAX_DISTANCE_METERS}m of office
+          </Text>
+        </View>
       </View>
 
       {/* Today's Attendance Status */}
@@ -128,6 +306,15 @@ export default function HomeScreen() {
             <Text style={styles.statusValue}>{todayStatus.totalHours}</Text>
           </View>
         </View>
+        
+        {todayStatus.location && (
+          <View style={styles.locationVerified}>
+            <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+            <Text style={styles.locationVerifiedText}>
+              Location verified: {todayStatus.distance}m from office
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Shift Timing Card */}
@@ -460,4 +647,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  clockButtonDisabled: {
+    opacity: 0.7,
+  },
+  locationInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  locationInfoText: {
+    fontSize: 13,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+  locationVerified: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    gap: 6,
+  },
+  locationVerifiedText: {
+    fontSize: 12,
+    color: '#2E7D32',
+    fontWeight: '500',
+  },
 });
+
