@@ -7,6 +7,7 @@ import HomeScreen from '../screens/HomeScreen';
 import AttendanceScreen from '../screens/AttendanceScreen';
 import LeaveScreen from '../screens/LeaveScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import FaceCaptureScreen from '../screens/FaceCaptureScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -58,6 +59,14 @@ export default function EmployeeNavigator({ onLogout }) {
       >
         {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
       </Tab.Screen>
+      <Tab.Screen 
+        name="FaceCapture" 
+        component={FaceCaptureScreen}
+        options={{
+          tabBarButton: () => null, // Hide from tab bar
+          headerShown: false,
+        }}
+      />
     </Tab.Navigator>
   );
 }

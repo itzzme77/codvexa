@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { OFFICE_LOCATIONS, MAX_ATTENDANCE_DISTANCE } from '../../config/officeLocations';
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation, route }) {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isClockIn, setIsClockIn] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -25,6 +25,7 @@ export default function HomeScreen() {
     totalHours: '0h 0m',
     location: null,
     distance: null,
+    facePhoto: null,
   });
 
   // Use main office location from config
@@ -38,6 +39,16 @@ export default function HomeScreen() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Handle photo returned from FaceCapture screen
+  useEffect(() => {
+    if (route.params?.capturedPhoto) {
+      const { capturedPhoto } = route.params;
+      handleCapturedPhoto(capturedPhoto);
+      // Clear the route params
+      navigation.setParams({ capturedPhoto: undefined });
+    }
+  }, [route.params?.capturedPhoto]);
 
   // Calculate distance between two coordinates using Haversine formula
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -153,7 +164,7 @@ export default function HomeScreen() {
   };
 
   const handleClockAction = async () => {
-    // Verify location before showing confirmation modal
+    // Verify location before proceeding to face capture
     const locationData = await verifyLocation();
     
     if (!locationData) {
@@ -175,12 +186,34 @@ export default function HomeScreen() {
       return;
     }
 
-    // Location verified - show confirmation modal
+    // Location verified - store location and navigate to face capture
     setTodayStatus({
       ...todayStatus,
       location: locationData,
       distance: distance,
     });
+
+    // Navigate to FaceCapture screen
+    navigation.navigate('FaceCapture', {
+      action: isClockIn ? 'clockOut' : 'clockIn',
+    });
+  };
+
+  const handleCapturedPhoto = (photoData) => {
+    // Process the captured photo
+    console.log('Face photo captured:', {
+      hasUri: !!photoData.uri,
+      hasBase64: !!photoData.base64,
+      action: photoData.action,
+    });
+
+    // Store the photo temporarily
+    setTodayStatus(prevStatus => ({
+      ...prevStatus,
+      facePhoto: photoData,
+    }));
+
+    // Show confirmation modal
     setModalVisible(true);
   };
 
@@ -200,7 +233,8 @@ export default function HomeScreen() {
         'Clock In Successful',
         `Time: ${timeNow}\n` +
         `Location verified: ${todayStatus.distance}m from office\n` +
-        `GPS: ${todayStatus.location?.latitude.toFixed(6)}, ${todayStatus.location?.longitude.toFixed(6)}`,
+        `GPS: ${todayStatus.location?.latitude.toFixed(6)}, ${todayStatus.location?.longitude.toFixed(6)}\n` +
+        `Face photo captured: Yes`,
         [{ text: 'OK' }]
       );
     } else {
@@ -218,19 +252,32 @@ export default function HomeScreen() {
         'Clock Out Successful',
         `Time: ${timeNow}\n` +
         `Total hours: ${totalHours}\n` +
-        `Location verified: ${todayStatus.distance}m from office`,
+        `Location verified: ${todayStatus.distance}m from office\n` +
+        `Face photo captured: Yes`,
         [{ text: 'OK' }]
       );
     }
     setModalVisible(false);
     
-    // Log for backend integration
-    console.log('Attendance marked:', {
+    // Log for backend integration (photo temporarily stored, would be sent to backend)
+    console.log('Attendance marked with verification:', {
       type: isClockIn ? 'clock-out' : 'clock-in',
       time: timeNow,
       location: todayStatus.location,
       distance: todayStatus.distance,
+      facePhotoUri: todayStatus.facePhoto?.uri,
+      // Note: base64 data is large, only log presence
+      hasFacePhotoBase64: !!todayStatus.facePhoto?.base64,
     });
+
+    // Clear the face photo after processing (it's only stored temporarily)
+    // In production, this would be sent to backend before clearing
+    setTimeout(() => {
+      setTodayStatus(prevStatus => ({
+        ...prevStatus,
+        facePhoto: null,
+      }));
+    }, 1000);
   };
 
   return (
