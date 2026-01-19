@@ -4,8 +4,10 @@
     "slug": "attendance-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assests/codvexalogo.png",
     "userInterfaceStyle": "light",
     "splash": {
+      "image": "./assests/codvexalogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -14,11 +16,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.company.codvexa"
+      "bundleIdentifier": "com.company.codvexa",
+      "icon": "./assests/codvexalogo.png"
     },
     "android": {
       "package": "com.company.codvexa",
+      "icon": "./assests/codvexalogo.png",
       "adaptiveIcon": {
+        "foregroundImage": "./assests/codvexalogo.png",
         "backgroundColor": "#ffffff"
       }
     },

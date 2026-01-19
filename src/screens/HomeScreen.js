@@ -13,6 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { OFFICE_LOCATIONS, MAX_ATTENDANCE_DISTANCE } from '../../config/officeLocations';
+import { verifyFace, enrollFace, checkFaceRecognitionHealth } from '../services/faceRecognitionService';
+import { getCurrentUser } from '../services/authService';
 
 export default function HomeScreen({ navigation, route }) {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -68,10 +70,12 @@ export default function HomeScreen({ navigation, route }) {
 
   const verifyLocation = async () => {
     try {
+      console.log('Requesting location permissions...');
       setCheckingLocation(true);
 
       // Request location permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('Permission status:', status);
       
       if (status !== 'granted') {
         Alert.alert(
@@ -84,11 +88,14 @@ export default function HomeScreen({ navigation, route }) {
       }
 
       // Get current location with high accuracy
+      console.log('Getting current position...');
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
 
       const { latitude, longitude } = location.coords;
+      console.log('Current position:', { latitude, longitude });
+      console.log('Office location:', OFFICE_LOCATION);
 
       // Calculate distance from office
       const distance = calculateDistance(
@@ -98,6 +105,7 @@ export default function HomeScreen({ navigation, route }) {
         OFFICE_LOCATION.longitude
       );
 
+      console.log('Calculated distance:', distance, 'meters');
       setCheckingLocation(false);
 
       return {
@@ -107,6 +115,7 @@ export default function HomeScreen({ navigation, route }) {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
+      console.error('Location verification error:', error);
       setCheckingLocation(false);
       Alert.alert(
         'Location Error',
@@ -164,17 +173,25 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   const handleClockAction = async () => {
+    console.log('=== CLOCK ACTION STARTED ===');
+    console.log('Current action:', isClockIn ? 'Clock Out' : 'Clock In');
+    
     // Verify location before proceeding to face capture
+    console.log('Starting location verification...');
     const locationData = await verifyLocation();
+    console.log('Location verification result:', locationData);
     
     if (!locationData) {
       // Location verification failed (error already shown)
+      console.log('Location verification failed - stopping');
       return;
     }
 
     const { distance } = locationData;
+    console.log(`Distance from office: ${distance}m (max allowed: ${MAX_DISTANCE_METERS}m)`);
 
     if (distance > MAX_DISTANCE_METERS) {
+      console.log('Distance check FAILED');
       Alert.alert(
         'Location Verification Failed',
         `You must be within ${MAX_DISTANCE_METERS} meters of the office to mark attendance.\n\n` +
@@ -186,6 +203,7 @@ export default function HomeScreen({ navigation, route }) {
       return;
     }
 
+    console.log('Distance check PASSED');
     // Location verified - store location and navigate to face capture
     setTodayStatus({
       ...todayStatus,
@@ -193,28 +211,195 @@ export default function HomeScreen({ navigation, route }) {
       distance: distance,
     });
 
+    console.log('Navigating to FaceCapture screen...');
     // Navigate to FaceCapture screen
     navigation.navigate('FaceCapture', {
       action: isClockIn ? 'clockOut' : 'clockIn',
     });
   };
 
-  const handleCapturedPhoto = (photoData) => {
-    // Process the captured photo
-    console.log('Face photo captured:', {
+  const handleCapturedPhoto = async (photoData) => {
+    // Process the captured photo with face recognition
+    console.log('=== FACE PHOTO CAPTURED ===');
+    console.log('Photo data:', {
       hasUri: !!photoData.uri,
       hasBase64: !!photoData.base64,
+      base64Length: photoData.base64?.length,
       action: photoData.action,
     });
 
-    // Store the photo temporarily
-    setTodayStatus(prevStatus => ({
-      ...prevStatus,
-      facePhoto: photoData,
-    }));
+    // Get current user ID
+    const currentUser = getCurrentUser();
+    if (!currentUser) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
 
-    // Show confirmation modal
-    setModalVisible(true);
+    const userId = currentUser.uid;
+    console.log('User ID:', userId);
+
+    try {
+      // Check if server is available first
+      console.log('Checking face recognition server health...');
+      const healthCheck = await checkFaceRecognitionHealth();
+      console.log('Health check result:', healthCheck);
+      if (!healthCheck.success) {
+        Alert.alert(
+          'Server Unavailable',
+          'Face recognition server is not available. Attendance will be marked without face verification.',
+          [
+            {
+              text: 'Continue Anyway',
+              onPress: () => {
+                setTodayStatus(prevStatus => ({
+                  ...prevStatus,
+                  facePhoto: photoData,
+                  faceVerified: false,
+                }));
+                setModalVisible(true);
+              }
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        return;
+      }
+
+      // Try to verify the face (this will tell us if user is enrolled or not)
+      console.log('Attempting to verify face for user:', userId);
+      const verifyResult = await verifyFace(userId, photoData.base64);
+      console.log('Verify result:', verifyResult);
+      
+      if (verifyResult.success && verifyResult.verified) {
+        // Face verified successfully
+        Alert.alert(
+          '✓ Face Verified',
+          `Identity confirmed!\nConfidence: ${verifyResult.confidence.toFixed(1)}%\n\nYou can now mark attendance.`,
+          [{ text: 'OK' }]
+        );
+        
+        setTodayStatus(prevStatus => ({
+          ...prevStatus,
+          facePhoto: photoData,
+          faceVerified: true,
+          faceConfidence: verifyResult.confidence,
+        }));
+        
+        setModalVisible(true);
+      } else if (verifyResult.error && verifyResult.error.includes('not enrolled')) {
+        // User not enrolled - this is their first time
+        Alert.alert(
+          'First Time Setup',
+          'This is your first time using face recognition. Let\'s enroll your face now!',
+          [
+            {
+              text: 'Enroll My Face',
+              onPress: async () => {
+                // Show enrolling message
+                Alert.alert(
+                  'Enrolling Face',
+                  'Please wait...',
+                  [],
+                  { cancelable: false }
+                );
+                
+                const enrollResult = await enrollFace(userId, photoData.base64);
+                
+                if (enrollResult.success) {
+                  Alert.alert(
+                    '✓ Enrollment Successful!',
+                    'Your face has been enrolled successfully! From now on, you can use face recognition for attendance.',
+                    [
+                      {
+                        text: 'Continue',
+                        onPress: () => {
+                          setTodayStatus(prevStatus => ({
+                            ...prevStatus,
+                            facePhoto: photoData,
+                            faceVerified: true,
+                            faceConfidence: 100,
+                          }));
+                          setModalVisible(true);
+                        }
+                      }
+                    ]
+                  );
+                } else {
+                  Alert.alert(
+                    'Enrollment Failed',
+                    enrollResult.error || 'Could not detect your face properly. Please try again with better lighting.',
+                    [
+                      {
+                        text: 'Try Again',
+                        onPress: () => navigation.navigate('FaceCapture', { action: photoData.action })
+                      },
+                      { text: 'Cancel', style: 'cancel' }
+                    ]
+                  );
+                }
+              }
+            },
+            { 
+              text: 'Cancel', 
+              style: 'cancel',
+              onPress: () => {
+                Alert.alert(
+                  'Skip Face Recognition?',
+                  'You can mark attendance without face recognition, but it is recommended for security.',
+                  [
+                    {
+                      text: 'Mark Without Face',
+                      onPress: () => {
+                        setTodayStatus(prevStatus => ({
+                          ...prevStatus,
+                          facePhoto: photoData,
+                          faceVerified: false,
+                        }));
+                        setModalVisible(true);
+                      }
+                    },
+                    { text: 'Go Back', style: 'cancel' }
+                  ]
+                );
+              }
+            }
+          ]
+        );
+      } else {
+        // Face verification failed - face doesn't match
+        Alert.alert(
+          '❌ Face Verification Failed',
+          verifyResult.error || 'The face does not match your enrolled face. Please try again.',
+          [
+            {
+              text: 'Retry Photo',
+              onPress: () => navigation.navigate('FaceCapture', { action: photoData.action })
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('Face recognition error:', error);
+      Alert.alert(
+        'Connection Error',
+        'Could not connect to face recognition server. Continue without verification?',
+        [
+          {
+            text: 'Continue Anyway',
+            onPress: () => {
+              setTodayStatus(prevStatus => ({
+                ...prevStatus,
+                facePhoto: photoData,
+                faceVerified: false,
+              }));
+              setModalVisible(true);
+            }
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+    }
   };
 
   const confirmClockAction = () => {

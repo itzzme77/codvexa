@@ -1,41 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { loginUser } from '../services/authService';
+
+// Change this line to your network IP for mobile testing
+const API_BASE_URL = 'http://10.192.120.73:5000';
 
 export default function LoginScreen({ onLogin }) {
   const [selectedTab, setSelectedTab] = useState('employee');
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    if (!username || !password) {
-      Alert.alert('Error', 'Please enter username and password');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
-    // Admin can login from either section
-    if (username === 'Admin01' && password === 'admin123') {
-      onLogin('admin');
-      return;
-    }
-
-    // Employee section
-    if (selectedTab === 'employee') {
-      if (username === 'Employee01' && password === 'employee123') {
-        onLogin('employee');
-      } else {
-        Alert.alert('Invalid credentials', 'Employee username or password is incorrect');
-      }
-    }
+    setLoading(true);
     
-    // Manager section
-    if (selectedTab === 'manager') {
-      if (username === 'Manager01' && password === 'manager123') {
-        onLogin('manager');
-      } else {
-        Alert.alert('Invalid credentials', 'Manager username or password is incorrect');
+    try {
+      const { user, role } = await loginUser(email, password);
+      
+      // Verify user role matches selected tab (except admin can access all)
+      if (role !== 'admin' && role !== selectedTab) {
+        Alert.alert(
+          'Access Denied', 
+          `This account is registered as ${role}. Please use the correct login section.`
+        );
+        setLoading(false);
+        return;
       }
+      
+      onLogin(role, user);
+    } catch (error) {
+      let errorMessage = 'Login failed. Please try again.';
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        errorMessage = 'Invalid email or password';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email format';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Too many failed attempts. Please try again later.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Login Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -60,7 +75,7 @@ export default function LoginScreen({ onLogin }) {
               style={[styles.tab, selectedTab === 'employee' && styles.tabActive]}
               onPress={() => {
                 setSelectedTab('employee');
-                setUsername('');
+                setEmail('');
                 setPassword('');
               }}
             >
@@ -78,7 +93,7 @@ export default function LoginScreen({ onLogin }) {
               style={[styles.tab, selectedTab === 'manager' && styles.tabActive]}
               onPress={() => {
                 setSelectedTab('manager');
-                setUsername('');
+                setEmail('');
                 setPassword('');
               }}
             >
@@ -96,15 +111,16 @@ export default function LoginScreen({ onLogin }) {
           {/* Login Form */}
           <View style={styles.formContainer}>
             <View style={styles.field}>
-              <Text style={styles.label}>Username</Text>
+              <Text style={styles.label}>Email</Text>
               <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={20} color="#999" style={styles.inputIcon} />
+                <Ionicons name="mail-outline" size={20} color="#999" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder={selectedTab === 'employee' ? 'Employee01' : 'Manager01'}
-                  value={username}
-                  onChangeText={setUsername}
+                  placeholder={selectedTab === 'employee' ? 'employee@example.com' : 'manager@example.com'}
+                  value={email}
+                  onChangeText={setEmail}
                   autoCapitalize="none"
+                  keyboardType="email-address"
                 />
               </View>
             </View>
@@ -130,9 +146,19 @@ export default function LoginScreen({ onLogin }) {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.button} onPress={handleLogin}>
-              <Text style={styles.buttonText}>Sign In</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <TouchableOpacity 
+              style={[styles.button, loading && styles.buttonDisabled]} 
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.buttonText}>Sign In</Text>
+                  <Ionicons name="arrow-forward" size={20} color="#fff" />
+                </>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -140,19 +166,14 @@ export default function LoginScreen({ onLogin }) {
           <View style={styles.hintBox}>
             <View style={styles.hintHeader}>
               <Ionicons name="information-circle" size={16} color="#4CAF50" />
-              <Text style={styles.hintTitle}>Test Credentials</Text>
+              <Text style={styles.hintTitle}>Firebase Authentication</Text>
             </View>
-            {selectedTab === 'employee' ? (
-              <>
-                <Text style={styles.hintText}>👤 Employee01 / employee123</Text>
-                <Text style={styles.hintTextSecondary}>🔑 Admin01 / admin123 (Admin access)</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.hintText}>👤 Manager01 / manager123</Text>
-                <Text style={styles.hintTextSecondary}>🔑 Admin01 / admin123 (Admin access)</Text>
-              </>
-            )}
+            <Text style={styles.hintText}>
+              Sign in with your registered email and password
+            </Text>
+            <Text style={styles.hintTextSecondary}>
+              Admin accounts can access all sections
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -279,6 +300,9 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   hintBox: {
     backgroundColor: '#F0FDF4',

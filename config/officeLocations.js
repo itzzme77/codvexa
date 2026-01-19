@@ -3,14 +3,20 @@
 
 export const OFFICE_LOCATIONS = {
   main: {
-    latitude: 19.2605095,  // Your office location
-    longitude: 76.8209881,
-    name: 'Main Office',
-    address: 'Nanded, Maharashtra, India',
+    latitude: 18.5602722,  // Pune Office
+    longitude: 73.9360088,
+    name: 'Main Office - Pune',
+    address: 'Pune, Maharashtra, India',
   },
   // Add more office locations if needed
   branch1: {
-    latitude: 28.5355,  // Example: Gurugram
+    latitude: 19.2605095,  // Nanded Branch
+    longitude: 76.8209881,
+    name: 'Branch Office - Nanded',
+    address: 'Nanded, Maharashtra, India',
+  },
+  branch2: {
+    latitude: 28.5355,  // Gurugram Branch
     longitude: 77.3910,
     name: 'Branch Office - Gurugram',
     address: 'Cyber City, Gurugram, Haryana, India',
@@ -18,7 +24,7 @@ export const OFFICE_LOCATIONS = {
 };
 
 // Maximum allowed distance from office in meters
-export const MAX_ATTENDANCE_DISTANCE = 100; // 100 meters
+export const MAX_ATTENDANCE_DISTANCE = 100; // 100 meters (adjust for testing)
 
 // How to find your office coordinates:
 // 1. Open Google Maps
